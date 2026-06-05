@@ -1,0 +1,27 @@
+# Executables
+*.exe
+client
+server
+
+# Object files
+*.o
+*.obj
+
+# Temporary / Build directories
+build/
+bin/
+obj/
+
+# IDE and Editor Files
+.vscode/
+.vs/
+.idea/
+*.suo
+*.user
+*.userossc
+*.sln
+*.vcxproj
+*.filters
+
+# Log files
+*.log

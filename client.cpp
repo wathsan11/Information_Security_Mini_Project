@@ -2,6 +2,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include "des.h"
+#include "rsa.h"
 
 using namespace std;
 
@@ -16,29 +17,6 @@ int main(){
     WSADATA wsa;
     WSAStartup(MAKEWORD(2,2), &wsa);
 
-    string key;
-    while(true){
-        cout<<"Key (64 hex chars / 256 bits): ";
-        cin>>key;
-        if(key.size() == 64){
-            bool valid = true;
-            for(char c : key){
-                if(!isxdigit(c)){
-                    valid = false;
-                    break;
-                }
-            }
-            if(valid) break;
-        }
-        cout<<"Invalid key. Must be exactly 64 hex characters.\n";
-    }
-
-    vector<vector<string>> keys256;
-    for(int i = 0; i < 4; i++){
-        string subkey = key.substr(i * 16, 16);
-        keys256.push_back(generateKeys(hex2bin(subkey)));
-    }
-
     SOCKET sock=socket(AF_INET,SOCK_STREAM,0);
 
     sockaddr_in serv{};
@@ -48,10 +26,34 @@ int main(){
 
     connect(sock,(sockaddr*)&serv,sizeof(serv));
 
-    cin.ignore();
+    // RSA Handshake: Receive server's public modulus n (16 hex chars)
+    char rsa_buf[17];
+    memset(rsa_buf, 0, 17);
+    recv(sock, rsa_buf, 16, 0);
+    string n_hex(rsa_buf);
+    uint64_t n = stoull(n_hex, nullptr, 16);
 
+    // Generate a random 256-bit DES key
     random_device rd;
     mt19937_64 generator(rd());
+    stringstream key_ss;
+    for (int i = 0; i < 4; i++) {
+        uint64_t rand_val = generator();
+        key_ss << hex << uppercase << setw(16) << setfill('0') << rand_val;
+    }
+    string key = key_ss.str();
+    cout << "Shared Secret Key (Generated): " << key << endl;
+
+    // Encrypt the key using RSA and send to the server
+    string encrypted_key = encryptKeyRSA(key, 65537, n);
+    send(sock, encrypted_key.c_str(), encrypted_key.size(), 0);
+
+    // Prepare DES keys
+    vector<vector<string>> keys256;
+    for(int i = 0; i < 4; i++){
+        string subkey = key.substr(i * 16, 16);
+        keys256.push_back(generateKeys(hex2bin(subkey)));
+    }
 
     while(true){
         string msg;
